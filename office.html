@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Kanban Board</title>
+    <style>
+        /* Modern Dark Theme & Glassmorphism */
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            background-image: radial-gradient(circle at 10% 20%, rgb(30, 41, 59) 0%, rgb(15, 23, 42) 90%);
+        }
+
+        .kanban-board {
+            display: flex;
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .column {
+            flex: 1;
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .column-header {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* Agent Cards */
+        .agent-card {
+            background: rgba(51, 65, 85, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: default;
+        }
+
+        .agent-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-content {
+            flex: 1;
+        }
+
+        .agent-name {
+            font-weight: 600;
+            font-size: 1rem;
+            margin: 0 0 0.2rem 0;
+            color: #f1f5f9;
+        }
+
+        .agent-role {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin: 0;
+        }
+
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        /* Status Colors & Animations */
+        .status-idle {
+            background: rgba(148, 163, 184, 0.2);
+            color: #cbd5e1;
+        }
+
+        .status-working {
+            background: rgba(56, 189, 248, 0.2);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+        }
+
+        .status-done {
+            background: rgba(52, 211, 153, 0.2);
+            color: #34d399;
+        }
+
+        /* Pulse Animation for Doing Column */
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(56, 189, 248, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+        }
+
+        .doing-card {
+            border-color: rgba(56, 189, 248, 0.5);
+            animation: pulse-border 2s infinite;
+        }
+
+        /* Agent specifics */
+        .avatar-alan { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; }
+        .avatar-mark { background: rgba(234, 179, 8, 0.2); color: #fde047; }
+        .avatar-joy { background: rgba(236, 72, 153, 0.2); color: #f9a8d4; }
+        
+    </style>
+</head>
+<body>
+
+    <div class="kanban-board">
+        <!-- To-Do Column -->
+        <div class="column" id="col-todo">
+            <div class="column-header">
+                대기 중 (To-Do)
+            </div>
+            <!-- 에이전트 카드가 동적으로 생성됩니다 -->
+        </div>
+
+        <!-- Doing Column -->
+        <div class="column" id="col-doing">
+            <div class="column-header">
+                작업 중 (Doing)
+            </div>
+            <!-- Working cards will move here -->
+        </div>
+
+        <!-- Done Column -->
+        <div class="column" id="col-done">
+            <div class="column-header">
+                작업 완료 (Done)
+            </div>
+            <!-- Finished cards will move here -->
+        </div>
+    </div>
+
+    <script>
+        const colTodo = document.getElementById('col-todo');
+        const colDoing = document.getElementById('col-doing');
+        const colDone = document.getElementById('col-done');
+
+        const agentMetadata = {
+            "theory_teacher": { name: "Alan", role: "Theory Teacher", icon: "👨‍🏫", class: "avatar-alan" },
+            "code_mark": { name: "Mark", role: "Senior Developer", icon: "👨‍💼", class: "avatar-mark" },
+            "study_buddy": { name: "Joy", role: "Study Buddy", icon: "🧑‍💻", class: "avatar-joy" }
+        };
+
+        function createAgentCard(agentId) {
+            const meta = agentMetadata[agentId] || { name: agentId, role: "Custom Agent", icon: "👤", class: "" };
+            
+            const card = document.createElement('div');
+            card.className = 'agent-card';
+            card.id = "card_" + agentId;
+            card.innerHTML = `
+                <div class="avatar ${meta.class}">${meta.icon}</div>
+                <div class="card-content">
+                    <p class="agent-name">${meta.name}</p>
+                    <p class="agent-role">${meta.role}</p>
+                </div>
+                <div class="status-badge status-idle">대기 중</div>
+            `;
+            return card;
+        }
+
+        window.addEventListener('message', event => {
+            const data = event.data;
+
+            if (data.command === 'updateStatus' && data.availableAgents) {
+                // 1. 새로운 에이전트 목록이 오면 카드를 생성
+                data.availableAgents.forEach(agentId => {
+                    if (!document.getElementById("card_" + agentId)) {
+                        const newCard = createAgentCard(agentId);
+                        colTodo.appendChild(newCard);
+                    }
+                });
+
+                // 2. 목록에 없는 카드는 화면에서 제거 (동기화)
+                const currentCards = document.querySelectorAll('.agent-card');
+                currentCards.forEach(card => {
+                    const id = card.id.replace('card_', '');
+                    if (!data.availableAgents.includes(id)) {
+                        card.remove();
+                    }
+                });
+                return;
+            }
+
+            if (data.agent && data.status) {
+                let card = document.getElementById("card_" + data.agent);
+                if (!card) {
+                    card = createAgentCard(data.agent);
+                    colTodo.appendChild(card);
+                }
+
+                const badge = card.querySelector('.status-badge');
+
+                if (data.status === "typing") {
+                    // Move to Doing
+                    colDoing.appendChild(card);
+                    card.classList.add("doing-card");
+                    
+                    // Update Badge
+                    badge.innerText = "작업 중";
+                    badge.className = "status-badge status-working";
+                    
+                } else if (data.status === "idle") {
+                    // Move to Done
+                    colDone.appendChild(card);
+                    card.classList.remove("doing-card");
+                    
+                    // Update Badge
+                    badge.innerText = "완료됨";
+                    badge.className = "status-badge status-done";
+                    
+                    // After a delay, reset back to To-Do
+                    setTimeout(() => {
+                        // Only move back if it's still in the Done column
+                        if (card.parentElement === colDone) {
+                            colTodo.appendChild(card);
+                            badge.innerText = "대기 중";
+                            badge.className = "status-badge status-idle";
+                        }
+                    }, 5000);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

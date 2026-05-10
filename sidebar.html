@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: 'Pretendard', sans-serif; padding: 15px; color: white; display: flex; flex-direction: column; gap: 12px; background: transparent; }
+        input { padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.5); color: white; border: 1px solid #555; width: 100%; box-sizing: border-box; }
+        button { padding: 10px; border-radius: 6px; background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; width: 100%; transition: 0.2s; }
+        button:hover { background: #0056b3; }
+        button.secondary { background: #28a745; margin-bottom: 10px; }
+        button.secondary:hover { background: #218838; }
+        .result-box { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; min-height: 200px; white-space: pre-wrap; font-size: 13px; line-height: 1.5; border: 1px solid rgba(255,255,255,0.1); }
+        .status-panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 10px; font-size: 12px; line-height: 1.6; }
+        .status-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .status-label { color: #aaa; }
+        .status-value { font-weight: bold; color: #ddd; word-break: break-all; text-align: right; margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <div class="status-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+            <span style="font-weight: bold; font-size: 13px; color: #fff;">⚙️ 시스템 대시보드</span>
+            <button onclick="openOffice()" style="background: transparent; border: 1px solid #28a745; color: #28a745; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; width: auto; transition: 0.2s;" onmouseover="this.style.background='rgba(40,167,69,0.1)'" onmouseout="this.style.background='transparent'">🏢 가상 사무실 열기</button>
+        </div>
+        <div class="status-row">
+            <span class="status-label" style="align-self: center;">서버 선택:</span>
+            <select id="ui-endpoint-select" onchange="onEndpointChange()" style="flex:1; margin-left:10px; background:rgba(0,0,0,0.5); color:white; border:1px solid #555; border-radius:4px; padding:2px 5px; font-size:11px; margin-bottom:0;">
+                <option value="http://127.0.0.1:1234/v1">LM Studio</option>
+                <option value="http://127.0.0.1:11434/v1">Ollama</option>
+            </select>
+        </div>
+        <div class="status-row">
+            <span class="status-label">LLM 연결:</span>
+            <span class="status-value" id="ui-llm-status">확인 중...</span>
+        </div>
+        <div class="status-row">
+            <span class="status-label" style="align-self: center;">모델명:</span>
+            <select id="ui-model-select" onchange="onModelChange()" style="flex:1; margin-left:10px; background:rgba(0,0,0,0.5); color:white; border:1px solid #555; border-radius:4px; padding:2px 5px; font-size:11px;">
+                <option value="">-</option>
+            </select>
+        </div>
+        <div class="status-row" style="margin-bottom: 0; align-items: center; cursor: pointer; padding: 4px; border-radius: 4px; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'" onclick="setWorkspace()" title="클릭하여 지식 공간 폴더 변경">
+            <span class="status-label">지식공간 <span style="font-size:11px;">⚙️</span>:</span>
+            <span class="status-value" id="ui-workspace-path" style="text-decoration: underline; text-underline-offset: 2px; color: #66b2ff;">-</span>
+        </div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:12px; color:#aaa; font-weight:bold;">🤖 에이전트 선택</span>
+            <div style="display:flex; gap:5px;">
+                <button onclick="createAgent()" style="width:auto; padding:2px 8px; font-size:10px; background:#6c757d;">➕ 새 에이전트</button>
+                <button onclick="deleteSelectedAgent()" style="width:auto; padding:2px 8px; font-size:10px; background:#d9534f;" title="선택된 커스텀 에이전트 삭제">🗑️ 삭제</button>
+            </div>
+        </div>
+        <select id="ui-agent-select" style="background:rgba(0,0,0,0.5); color:white; border:1px solid #555; border-radius:6px; padding:8px; font-size:13px;">
+            <option value="pipeline">🚀 CEO 자동 업무 배정 (오케스트레이션)</option>
+        </select>
+        <input type="text" id="topicInput" placeholder="주제 입력 (예: 함수)">
+        <button onclick="handleExecution()" id="execBtn">지시하기</button>
+    </div>
+    
+    <div class="result-box" id="resultBox">📡 AI 비서 대기 중! 주제를 지시해보세요.</div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        function onModelChange() {
+            const selectEl = document.getElementById("ui-model-select");
+            if (selectEl.value) {
+                vscode.postMessage({ command: "changeModel", model: selectEl.value });
+            }
+        }
+
+        function onEndpointChange() {
+            const selectEl = document.getElementById("ui-endpoint-select");
+            if (selectEl.value) {
+                vscode.postMessage({ command: "changeEndpoint", endpoint: selectEl.value });
+            }
+        }
+
+        window.addEventListener('message', event => {
+            if (event.data.command === 'updateStatus') {
+                document.getElementById('ui-llm-status').innerText = event.data.llmStatus;
+                document.getElementById('ui-workspace-path').innerText = event.data.workspacePath;
+                if (event.data.llmEndpoint) {
+                    document.getElementById('ui-endpoint-select').value = event.data.llmEndpoint;
+                }
+                
+                const selectEl = document.getElementById('ui-model-select');
+                selectEl.innerHTML = '';
+                
+                if (event.data.availableModels && event.data.availableModels.length > 0) {
+                    event.data.availableModels.forEach(model => {
+                        const opt = document.createElement('option');
+                        opt.value = model;
+                        opt.textContent = model;
+                        if (model === event.data.currentModel) {
+                            opt.selected = true;
+                        }
+                        selectEl.appendChild(opt);
+                    });
+                } else {
+                    const opt = document.createElement('option');
+                    opt.textContent = '-';
+                    selectEl.appendChild(opt);
+                }
+                if (event.data.availableAgents && event.data.availableAgents.length > 0) {
+                    const agentSelect = document.getElementById('ui-agent-select');
+                    const currentValue = agentSelect.value;
+                    // 첫 번째 옵션(파이프라인) 유지하고 나머지 초기화
+                    agentSelect.innerHTML = '<option value="pipeline">🚀 CEO 자동 업무 배정 (오케스트레이션)</option>';
+                    event.data.availableAgents.forEach(agent => {
+                        if (agent === 'ceo') return; // CEO는 단일 에이전트 목록에서 제외
+                        const opt = document.createElement('option');
+                        opt.value = agent;
+                        opt.textContent = `👤 ${agent}`;
+                        agentSelect.appendChild(opt);
+                    });
+                    agentSelect.value = currentValue || 'pipeline';
+                }
+                return;
+            }
+            if (event.data.message) document.getElementById("resultBox").innerText = event.data.message;
+            if (event.data.result) document.getElementById("resultBox").innerText = event.data.result;
+        });
+
+        function openOffice() {
+            vscode.postMessage({ command: "openOffice" });
+        }
+
+        function setWorkspace() {
+            vscode.postMessage({ command: "setWorkspace" });
+        }
+
+        function createAgent() {
+            vscode.postMessage({ command: "createAgent" });
+        }
+
+        function deleteSelectedAgent() {
+            const agent = document.getElementById("ui-agent-select").value;
+            if (agent === "pipeline") return alert("전체 파이프라인 모드는 삭제할 수 없습니다.");
+            // 확인 절차는 백엔드(VS Code)에서 처리하도록 메시지만 전송
+            vscode.postMessage({ command: "deleteAgent", agent: agent });
+        }
+
+        function handleExecution() {
+            const agent = document.getElementById("ui-agent-select").value;
+            const topic = document.getElementById("topicInput").value;
+            if(!topic) return alert("주제를 입력하세요!");
+
+            if (agent === "pipeline") {
+                vscode.postMessage({ command: "startPipeline", topic: topic });
+            } else {
+                vscode.postMessage({ command: "runSingleAgent", agent: agent, topic: topic });
+            }
+        }
+    </script>
+</body>
+</html>

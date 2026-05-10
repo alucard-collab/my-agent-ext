@@ -1,0 +1,77 @@
+{
+  "name": "my-agent-ext",
+  "displayName": "My AI Agent",
+  "description": "1인 기업 AI 사무실 대시보드 익스텐션",
+  "version": "0.0.1",
+  "publisher": "my-agent-creator",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/my-agent-ext.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "my-agent-sidebar",
+          "title": "My AI Agent",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "my-agent-sidebar": [
+        {
+          "type": "webview",
+          "id": "my-agent-sidebar.view",
+          "name": "대시보드"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "my-agent-ext.openDashboard",
+        "title": "My Agent: 열기"
+      },
+      {
+        "command": "my-agent-ext.setWorkspace",
+        "title": "My Agent: 로컬 지식 공간 폴더 설정"
+      }
+    ],
+    "configuration": {
+      "title": "My AI Agent",
+      "properties": {
+        "myAgentExt.workspacePath": {
+          "type": "string",
+          "default": "",
+          "description": "커스텀 에이전트 마크다운 파일이 저장된 로컬 폴더 경로 (예: C:\\AIAgent\\obsidian)"
+        },
+        "myAgentExt.llmEndpoint": {
+          "type": "string",
+          "default": "http://127.0.0.1:1234/v1",
+          "description": "LLM API 서버 엔드포인트 URL (기본값: LM Studio. Ollama 사용시 http://127.0.0.1:11434/v1 등으로 변경)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "18.x",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "openai": "^6.37.0"
+  }
+}
